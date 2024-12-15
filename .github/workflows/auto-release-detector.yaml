@@ -1,0 +1,47 @@
+name: Auto Release Publish on Version Change
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  release_publish:
+    name: Auto Release Publish on Version Change
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Get Prior Version
+        id: prior-version
+        run: |
+          prior_version=$(git show HEAD~1:pyproject.toml | grep -E '^version = ' | sed -E 's/version = "(.*)"/\1/')
+          echo "$(git show HEAD~1:pyproject.toml | grep -E '^version = ' | sed -E 's/version = "(.*)"/\1/')"
+          echo "prior_version=$prior_version" >> $GITHUB_ENV
+      - name: Extract Current Version
+        id: current-version
+        run: |
+          current_version=$(grep -E '^version = ' pyproject.toml | sed -E 's/version = "(.*)"/\1/')
+          echo "current_version=$current_version" >> $GITHUB_ENV
+      - name: Compare versions
+        id: version-check
+        run: |
+          if [ "$prior_version" = "$current_version" ]; then
+            echo "Version has not changed. Exiting."
+            exit 0
+          else
+            echo "Version has changed from $prior_version to $current_version."
+            echo "formatted_tag=v$current_version" >> $GITHUB_ENV
+          fi
+      - name: Create/Publish a GitHub Release
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.REPO_PAT }}
+          tag: ${{ env.formatted_tag }}
+          name: Authomatic Release ${{ env.formatted_tag }}
+          body: |
+            Automatic Release ${{ env.formatted_tag }}
+          draft: false
+          prerelease: false
